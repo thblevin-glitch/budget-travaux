@@ -180,45 +180,6 @@ colB.metric("Total dépensé", fmt(total_depenses))
 colC.metric("Reste à dépenser", fmt(reste))
 st.divider()
 
-
-# === GRAPHIQUE PAR POSTE =====================================================
-st.subheader("📊 Répartition des dépenses par poste")
-
-if not df.empty and "poste" in df.columns and "montant" in df.columns:
-    df_visu = df[df["poste"].isin(postes_visibles)]
-    agg = (
-        df_visu.groupby("poste", dropna=False)["montant"]
-        .sum()
-        .reindex(POSTES, fill_value=0)
-    )
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    # 🎨 Couleurs par poste (sans légende)
-    colors = [COULEURS_POSTE.get(poste, "#9ca3af") for poste in agg.index]
-    ax.bar(agg.index, agg.values, color=colors)
-
-    # 🚫 Enlever totalement l’axe Y (montants à gauche)
-    ax.set_ylabel("")                 # pas de libellé d’axe
-    ax.yaxis.set_visible(False)       # cache les graduations et les valeurs
-    ax.spines["left"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.grid(False)
-
-    # Axe X lisible
-    ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
-
-    # (Optionnel) afficher les valeurs au-dessus de chaque barre :
-    # for x, v in zip(range(len(agg.index)), agg.values):
-    #     ax.text(x, v, f"{v:,.0f} €".replace(",", " ").replace(".", ","),
-    #             ha="center", va="bottom", fontsize=8)
-
-    plt.tight_layout()
-    st.pyplot(fig, use_container_width=False)
-else:
-    st.info("Aucune dépense enregistrée pour l’instant.")
-
-
 # === TABLE ÉDITABLE (compacte) ===============================================
 st.subheader("📄 Liste des dépenses (modifiable)")
 
