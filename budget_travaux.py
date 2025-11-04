@@ -112,10 +112,6 @@ budget_global = st.sidebar.number_input("Budget global (€)", value=DEFAULT_BUD
 postes_visibles = st.sidebar.multiselect("Postes visibles", options=POSTES, default=POSTES)
 st.sidebar.caption("💾 Données sauvegardées dans Google Sheets (partagées).")
 
-# Auto-refresh pour voir les ajouts de l'autre personne
-st_autorefresh(interval=30_000, key="auto_refresh")
-
-
 # Chargement des données avec garde-fous
 try:
     df = load_data()
