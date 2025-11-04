@@ -186,14 +186,29 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
 else:
     st.info("Aucune dépense enregistrée pour l’instant.")
 
-# === TABLE ===================================================================
-st.subheader("📄 Liste des dépenses")
+# === TABLE ÉDITABLE ==========================================================
+st.subheader("📄 Liste des dépenses (modifiable)")
+
 if not df.empty:
-    st.dataframe(
-        df.sort_values(by="date", ascending=False),
+    df_sorted = df.sort_values(by="date", ascending=False).reset_index(drop=True)
+
+    # ✅ Tableau interactif éditable
+    edited_df = st.data_editor(
+        df_sorted,
+        num_rows="dynamic",
         use_container_width=True,
-        height=320
+        key="depenses_editor"
     )
+
+    # 🔄 Si l'utilisateur modifie quelque chose
+    if not edited_df.equals(df_sorted):
+        st.info("💾 Modifications détectées. Cliquez pour enregistrer.")
+        if st.button("✅ Enregistrer les changements dans Google Sheets"):
+            try:
+                save_data(edited_df)
+                st.success("✅ Données mises à jour dans Google Sheets !")
+            except Exception as e:
+                st.error(f"❌ Erreur lors de la sauvegarde : {e}")
 else:
     st.caption("La table s’affichera après l’ajout de vos premières dépenses.")
 
