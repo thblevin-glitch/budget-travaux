@@ -194,7 +194,7 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
 
     fig, ax = plt.subplots(figsize=(6, 4))
 
-    # 🎨 Couleurs par poste
+    # 🎨 Couleurs par poste (sans légende)
     colors = [COULEURS_POSTE.get(poste, "#9ca3af") for poste in agg.index]
     ax.bar(agg.index, agg.values, color=colors)
 
@@ -206,11 +206,6 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
     ax.set_ylabel("Montant (€)")
     ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
     plt.tight_layout()
-
-    # Légende compacte (3 colonnes)
-    handles = [Patch(facecolor=COULEURS_POSTE[p], label=p) for p in POSTES]
-    ax.legend(handles=handles, ncol=3, loc="upper right", fontsize=8, frameon=False)
-
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("Aucune dépense enregistrée pour l’instant.")
