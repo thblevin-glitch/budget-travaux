@@ -198,13 +198,21 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
     colors = [COULEURS_POSTE.get(poste, "#9ca3af") for poste in agg.index]
     ax.bar(agg.index, agg.values, color=colors)
 
-    # ✅ Format € sans notation scientifique
-    ax.yaxis.set_major_formatter(
-        mticker.FuncFormatter(lambda x, p: f"{x:,.0f} €".replace(",", " ").replace(".", ","))
-    )
+    # 🚫 Enlever totalement l’axe Y (montants à gauche)
+    ax.set_ylabel("")                 # pas de libellé d’axe
+    ax.yaxis.set_visible(False)       # cache les graduations et les valeurs
+    ax.spines["left"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.grid(False)
 
-    ax.set_ylabel("Montant (€)")
+    # Axe X lisible
     ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
+
+    # (Optionnel) afficher les valeurs au-dessus de chaque barre :
+    # for x, v in zip(range(len(agg.index)), agg.values):
+    #     ax.text(x, v, f"{v:,.0f} €".replace(",", " ").replace(".", ","),
+    #             ha="center", va="bottom", fontsize=8)
+
     plt.tight_layout()
     st.pyplot(fig, use_container_width=False)
 else:
