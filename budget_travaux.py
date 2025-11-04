@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import date
 from google.oauth2.service_account import Credentials
 import gspread
+import matplotlib.ticker as mticker
+
 
 # 👉 Doit être le 1er appel Streamlit :
 st.set_page_config(page_title="Budget travaux", page_icon="🛠️", layout="wide")
@@ -152,9 +154,10 @@ if submitted:
 total_depenses = pd.to_numeric(df["montant"], errors="coerce").fillna(0.0).sum() if not df.empty else 0.0
 reste = budget_global - total_depenses
 colA, colB, colC = st.columns(3)
-colA.metric("Budget global", f"{budget_global:,.0f} €".replace(",", " "))
-colB.metric("Total dépensé", f"{total_depenses:,.0f} €".replace(",", " "))
-colC.metric("Reste à dépenser", f"{reste:,.0f} €".replace(",", " "))
+fmt = lambda n: f"{n:,.2f} €".replace(",", " ").replace(".", ",")
+colA.metric("Budget global", fmt(budget_global))
+colB.metric("Total dépensé", fmt(total_depenses))
+colC.metric("Reste à dépenser", fmt(reste))
 st.divider()
 
 # === GRAPHIQUE PAR POSTE =====================================================
@@ -162,12 +165,19 @@ st.subheader("📊 Répartition des dépenses par poste")
 df_visu = df[df["poste"].isin(postes_visibles)] if not df.empty else df
 if not df_visu.empty:
     agg = df_visu.groupby("poste", dropna=False)["montant"].sum().reindex(POSTES, fill_value=0)
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar(agg.index, agg.values)
-    ax.set_ylabel("Montant (€)")
-    ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
-    plt.tight_layout()
-    st.pyplot(fig, use_container_width=False)
+ fig, ax = plt.subplots(figsize=(6, 4))
+ax.bar(agg.index, agg.values)
+
+# ✅ Format € avec séparateur de milliers (1 234 €) et sans notation scientifique
+ax.yaxis.set_major_formatter(
+    mticker.FuncFormatter(lambda x, p: f"{x:,.0f} €".replace(",", " ").replace(".", ","))
+)
+
+ax.set_ylabel("Montant (€)")
+ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
+plt.tight_layout()
+st.pyplot(fig, use_container_width=False)
+
 else:
     st.info("Aucune dépense enregistrée pour l’instant.")
 
