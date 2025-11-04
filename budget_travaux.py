@@ -2,15 +2,43 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.patches import Patch
 from pathlib import Path
 from datetime import date
 from google.oauth2.service_account import Credentials
 import gspread
-import matplotlib.ticker as mticker
-
 
 # 👉 Doit être le 1er appel Streamlit :
 st.set_page_config(page_title="Budget travaux", page_icon="🛠️", layout="wide")
+
+
+# --- CONFIG / INIT ------------------------------------------
+DATA_DIR = Path("data")
+CSV_PATH = DATA_DIR / "depenses.csv"   # conservé si jamais tu veux un backup local
+DATA_DIR.mkdir(exist_ok=True)
+
+DEFAULT_BUDGET = 68840
+POSTES = [
+    "Maçonnerie", "Menuiserie", "Cuisine", "Salle de bain", "Électricité",
+    "Plomberie", "Chauffage", "Isolation", "Matériaux", "Peinture", "Divers"
+]
+
+# 🎨 Palette de couleurs par poste (tu peux ajuster)
+COULEURS_POSTE = {
+    "Maçonnerie":   "#b91c1c",  # rouge brique
+    "Menuiserie":   "#92400e",  # brun bois
+    "Cuisine":      "#d97706",  # orange doré
+    "Salle de bain":"#2563eb",  # bleu eau
+    "Électricité":  "#facc15",  # jaune vif
+    "Plomberie":    "#06b6d4",  # turquoise
+    "Chauffage":    "#dc2626",  # rouge chaud
+    "Isolation":    "#16a34a",  # vert
+    "Matériaux":    "#6b7280",  # gris
+    "Peinture":     "#a855f7",  # violet
+    "Divers":       "#f97316",  # orange
+}
+
 
 # --- DIAGNOSTIC GOOGLE SHEETS -------------------------------
 with st.sidebar.expander("🔍 Diagnostic Google Sheets", expanded=False):
@@ -43,12 +71,6 @@ with st.sidebar.expander("🔍 Diagnostic Google Sheets", expanded=False):
         st.error(f"❌ Erreur : {e}")
 # ------------------------------------------------------------
 
-# --- CONFIG / INIT ------------------------------------------
-DATA_DIR = Path("data")
-CSV_PATH = DATA_DIR / "depenses.csv"
-DEFAULT_BUDGET = 68000
-POSTES = ["Maçonnerie","Menuiserie","Cuisine","Salle de bain","Électricité","Plomberie","Chauffage","Isolation","Matériaux","Peinture","Divers"]
-DATA_DIR.mkdir(exist_ok=True)
 
 # --- GOOGLE SHEETS HELPERS ---------------------------------------------------
 def _gs_client():
@@ -101,15 +123,12 @@ def save_data(df: pd.DataFrame):
         st.sidebar.success("✅ Données synchronisées avec Google Sheets")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur écriture Google Sheets : {e}")
+
+
 # === CORPS DE L'APP ==========================================================
-# Titre / entête
 st.title("🛠️ Suivi de budget travaux")
 
 # Sidebar : budget + postes + note
-DEFAULT_BUDGET = 68000
-POSTES = ["Maçonnerie","Menuiserie","Cuisine","Salle de bain","Électricité",
-          "Plomberie","Chauffage","Isolation","Matériaux","Peinture","Divers"]
-
 budget_global = st.sidebar.number_input("Budget global (€)", value=DEFAULT_BUDGET, step=500, min_value=0)
 postes_visibles = st.sidebar.multiselect("Postes visibles", options=POSTES, default=POSTES)
 st.sidebar.caption("💾 Données sauvegardées dans Google Sheets (partagées).")
@@ -120,6 +139,7 @@ try:
 except Exception as e:
     st.error(f"❌ Erreur lors du chargement des données : {e}")
     df = pd.DataFrame(columns=["poste","fournisseur","description","montant","date"])
+
 
 # === FORMULAIRE : AJOUT DÉPENSE =============================================
 st.subheader("➕ Ajouter une dépense")
@@ -142,13 +162,13 @@ if submitted:
         "montant": float(montant),
         "date": d,   # save_data s'occupe du formatage
     }
-    # on concatène proprement puis on sauvegarde
     df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     try:
         save_data(df)
         st.success("✅ Dépense ajoutée et enregistrée.")
     except Exception as e:
         st.error(f"❌ Erreur lors de l’enregistrement : {e}")
+
 
 # === METRICS =================================================================
 total_depenses = pd.to_numeric(df["montant"], errors="coerce").fillna(0.0).sum() if not df.empty else 0.0
@@ -159,6 +179,7 @@ colA.metric("Budget global", fmt(budget_global))
 colB.metric("Total dépensé", fmt(total_depenses))
 colC.metric("Reste à dépenser", fmt(reste))
 st.divider()
+
 
 # === GRAPHIQUE PAR POSTE =====================================================
 st.subheader("📊 Répartition des dépenses par poste")
@@ -172,9 +193,12 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
     )
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar(agg.index, agg.values)
 
-    # ✅ Format € avec séparateur de milliers et sans notation scientifique
+    # 🎨 Couleurs par poste
+    colors = [COULEURS_POSTE.get(poste, "#9ca3af") for poste in agg.index]
+    ax.bar(agg.index, agg.values, color=colors)
+
+    # ✅ Format € sans notation scientifique
     ax.yaxis.set_major_formatter(
         mticker.FuncFormatter(lambda x, p: f"{x:,.0f} €".replace(",", " ").replace(".", ","))
     )
@@ -182,9 +206,15 @@ if not df.empty and "poste" in df.columns and "montant" in df.columns:
     ax.set_ylabel("Montant (€)")
     ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
     plt.tight_layout()
+
+    # Légende compacte (3 colonnes)
+    handles = [Patch(facecolor=COULEURS_POSTE[p], label=p) for p in POSTES]
+    ax.legend(handles=handles, ncol=3, loc="upper right", fontsize=8, frameon=False)
+
     st.pyplot(fig, use_container_width=False)
 else:
     st.info("Aucune dépense enregistrée pour l’instant.")
+
 
 # === TABLE ÉDITABLE ==========================================================
 st.subheader("📄 Liste des dépenses (modifiable)")
@@ -192,25 +222,31 @@ st.subheader("📄 Liste des dépenses (modifiable)")
 if not df.empty:
     df_sorted = df.sort_values(by="date", ascending=False).reset_index(drop=True)
 
-    # ✅ Tableau interactif éditable
     edited_df = st.data_editor(
         df_sorted,
         num_rows="dynamic",
         use_container_width=True,
-        key="depenses_editor"
+        key="depenses_editor",
+        column_config={
+            "montant": st.column_config.NumberColumn("montant", help="Montant en €", step=1, format="%.2f"),
+            "date": st.column_config.DateColumn("date")
+        }
     )
 
-    # 🔄 Si l'utilisateur modifie quelque chose
     if not edited_df.equals(df_sorted):
         st.info("💾 Modifications détectées. Cliquez pour enregistrer.")
         if st.button("✅ Enregistrer les changements dans Google Sheets"):
             try:
+                # Types de colonnes robustes avant sauvegarde
+                edited_df["montant"] = pd.to_numeric(edited_df["montant"], errors="coerce").fillna(0.0)
+                edited_df["date"] = pd.to_datetime(edited_df["date"], errors="coerce").dt.date
                 save_data(edited_df)
                 st.success("✅ Données mises à jour dans Google Sheets !")
             except Exception as e:
                 st.error(f"❌ Erreur lors de la sauvegarde : {e}")
 else:
     st.caption("La table s’affichera après l’ajout de vos premières dépenses.")
+
 
 # === EXPORT ==================================================================
 st.download_button(
@@ -221,4 +257,3 @@ st.download_button(
     use_container_width=True
 )
 # ============================================================================
-
