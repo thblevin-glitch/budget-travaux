@@ -211,28 +211,35 @@ else:
     st.info("Aucune dépense enregistrée pour l’instant.")
 
 
-# === TABLE ÉDITABLE ==========================================================
+# === TABLE ÉDITABLE (compacte) ===============================================
 st.subheader("📄 Liste des dépenses (modifiable)")
 
 if not df.empty:
+    # Trie les données récentes en premier
     df_sorted = df.sort_values(by="date", ascending=False).reset_index(drop=True)
 
+    # ✅ Tableau interactif éditable, sans index et plus compact
     edited_df = st.data_editor(
         df_sorted,
         num_rows="dynamic",
         use_container_width=True,
+        hide_index=True,           # 👈 enlève les numéros à gauche
+        height=280,                # 👈 réduit la hauteur visible du tableau
         key="depenses_editor",
         column_config={
-            "montant": st.column_config.NumberColumn("montant", help="Montant en €", step=1, format="%.2f"),
-            "date": st.column_config.DateColumn("date")
+            "poste": st.column_config.TextColumn("Poste"),
+            "fournisseur": st.column_config.TextColumn("Fournisseur"),
+            "description": st.column_config.TextColumn("Description"),
+            "montant": st.column_config.NumberColumn("Montant (€)", help="Montant en euros", step=1, format="%.2f"),
+            "date": st.column_config.DateColumn("Date"),
         }
     )
 
+    # 🔄 Détection de modifications
     if not edited_df.equals(df_sorted):
         st.info("💾 Modifications détectées. Cliquez pour enregistrer.")
         if st.button("✅ Enregistrer les changements dans Google Sheets"):
             try:
-                # Types de colonnes robustes avant sauvegarde
                 edited_df["montant"] = pd.to_numeric(edited_df["montant"], errors="coerce").fillna(0.0)
                 edited_df["date"] = pd.to_datetime(edited_df["date"], errors="coerce").dt.date
                 save_data(edited_df)
@@ -241,6 +248,7 @@ if not df.empty:
                 st.error(f"❌ Erreur lors de la sauvegarde : {e}")
 else:
     st.caption("La table s’affichera après l’ajout de vos premières dépenses.")
+
 
 
 # === EXPORT ==================================================================
