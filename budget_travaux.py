@@ -113,7 +113,8 @@ postes_visibles = st.sidebar.multiselect("Postes visibles", options=POSTES, defa
 st.sidebar.caption("💾 Données sauvegardées dans Google Sheets (partagées).")
 
 # Auto-refresh pour voir les ajouts de l'autre personne
-st.experimental_autorefresh(interval=30_000, key="auto_refresh")
+st_autorefresh(interval=30_000, key="auto_refresh")
+
 
 # Chargement des données avec garde-fous
 try:
