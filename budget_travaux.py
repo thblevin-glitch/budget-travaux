@@ -99,4 +99,99 @@ def save_data(df: pd.DataFrame):
         st.sidebar.success("✅ Données synchronisées avec Google Sheets")
     except Exception as e:
         st.sidebar.error(f"❌ Erreur écriture Google Sheets : {e}")
+# === CORPS DE L'APP ==========================================================
+# Titre / entête
+st.title("🛠️ Suivi de budget travaux")
+
+# Sidebar : budget + postes + note
+DEFAULT_BUDGET = 68000
+POSTES = ["Maçonnerie","Menuiserie","Cuisine","Salle de bain","Électricité",
+          "Plomberie","Chauffage","Isolation","Matériaux","Peinture","Divers"]
+
+budget_global = st.sidebar.number_input("Budget global (€)", value=DEFAULT_BUDGET, step=500, min_value=0)
+postes_visibles = st.sidebar.multiselect("Postes visibles", options=POSTES, default=POSTES)
+st.sidebar.caption("💾 Données sauvegardées dans Google Sheets (partagées).")
+
+# Auto-refresh pour voir les ajouts de l'autre personne
+st.experimental_autorefresh(interval=30_000, key="auto_refresh")
+
+# Chargement des données avec garde-fous
+try:
+    df = load_data()
+except Exception as e:
+    st.error(f"❌ Erreur lors du chargement des données : {e}")
+    df = pd.DataFrame(columns=["poste","fournisseur","description","montant","date"])
+
+# === FORMULAIRE : AJOUT DÉPENSE =============================================
+st.subheader("➕ Ajouter une dépense")
+with st.form("form_depense", clear_on_submit=True):
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        poste = st.selectbox("Poste", options=POSTES)
+        fournisseur = st.text_input("Fournisseur", placeholder="Ex: Leroy Merlin")
+        montant = st.number_input("Montant (€)", min_value=0.0, step=10.0, format="%.2f")
+    with col2:
+        description = st.text_input("Description", placeholder="Ex: Carrelage salle de bain")
+        d = st.date_input("Date", value=date.today())
+    submitted = st.form_submit_button("Ajouter")
+
+if submitted:
+    new_row = {
+        "poste": poste,
+        "fournisseur": fournisseur,
+        "description": description,
+        "montant": float(montant),
+        "date": d,   # save_data s'occupe du formatage
+    }
+    # on concatène proprement puis on sauvegarde
+    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+    try:
+        save_data(df)
+        st.success("✅ Dépense ajoutée et enregistrée.")
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l’enregistrement : {e}")
+
+# === METRICS =================================================================
+total_depenses = pd.to_numeric(df["montant"], errors="coerce").fillna(0.0).sum() if not df.empty else 0.0
+reste = budget_global - total_depenses
+colA, colB, colC = st.columns(3)
+colA.metric("Budget global", f"{budget_global:,.0f} €".replace(",", " "))
+colB.metric("Total dépensé", f"{total_depenses:,.0f} €".replace(",", " "))
+colC.metric("Reste à dépenser", f"{reste:,.0f} €".replace(",", " "))
+st.divider()
+
+# === GRAPHIQUE PAR POSTE =====================================================
+st.subheader("📊 Répartition des dépenses par poste")
+df_visu = df[df["poste"].isin(postes_visibles)] if not df.empty else df
+if not df_visu.empty:
+    agg = df_visu.groupby("poste", dropna=False)["montant"].sum().reindex(POSTES, fill_value=0)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(agg.index, agg.values)
+    ax.set_ylabel("Montant (€)")
+    ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
+    plt.tight_layout()
+    st.pyplot(fig, use_container_width=False)
+else:
+    st.info("Aucune dépense enregistrée pour l’instant.")
+
+# === TABLE ===================================================================
+st.subheader("📄 Liste des dépenses")
+if not df.empty:
+    st.dataframe(
+        df.sort_values(by="date", ascending=False),
+        use_container_width=True,
+        height=320
+    )
+else:
+    st.caption("La table s’affichera après l’ajout de vos premières dépenses.")
+
+# === EXPORT ==================================================================
+st.download_button(
+    "⬇️ Télécharger en CSV",
+    data=df.to_csv(index=False).encode("utf-8"),
+    file_name="depenses.csv",
+    mime="text/csv",
+    use_container_width=True
+)
+# ============================================================================
 
