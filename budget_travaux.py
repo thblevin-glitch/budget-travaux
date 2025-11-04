@@ -162,22 +162,27 @@ st.divider()
 
 # === GRAPHIQUE PAR POSTE =====================================================
 st.subheader("📊 Répartition des dépenses par poste")
-df_visu = df[df["poste"].isin(postes_visibles)] if not df.empty else df
-if not df_visu.empty:
-    agg = df_visu.groupby("poste", dropna=False)["montant"].sum().reindex(POSTES, fill_value=0)
- fig, ax = plt.subplots(figsize=(6, 4))
-ax.bar(agg.index, agg.values)
 
-# ✅ Format € avec séparateur de milliers (1 234 €) et sans notation scientifique
-ax.yaxis.set_major_formatter(
-    mticker.FuncFormatter(lambda x, p: f"{x:,.0f} €".replace(",", " ").replace(".", ","))
-)
+if not df.empty and "poste" in df.columns and "montant" in df.columns:
+    df_visu = df[df["poste"].isin(postes_visibles)]
+    agg = (
+        df_visu.groupby("poste", dropna=False)["montant"]
+        .sum()
+        .reindex(POSTES, fill_value=0)
+    )
 
-ax.set_ylabel("Montant (€)")
-ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
-plt.tight_layout()
-st.pyplot(fig, use_container_width=False)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(agg.index, agg.values)
 
+    # ✅ Format € avec séparateur de milliers et sans notation scientifique
+    ax.yaxis.set_major_formatter(
+        mticker.FuncFormatter(lambda x, p: f"{x:,.0f} €".replace(",", " ").replace(".", ","))
+    )
+
+    ax.set_ylabel("Montant (€)")
+    ax.set_xticklabels(agg.index, rotation=45, ha="right", fontsize=9)
+    plt.tight_layout()
+    st.pyplot(fig, use_container_width=False)
 else:
     st.info("Aucune dépense enregistrée pour l’instant.")
 
