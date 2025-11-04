@@ -47,3 +47,56 @@ CSV_PATH = DATA_DIR / "depenses.csv"
 DEFAULT_BUDGET = 68000
 POSTES = ["Maçonnerie","Menuiserie","Cuisine","Salle de bain","Électricité","Plomberie","Chauffage","Isolation","Matériaux","Peinture","Divers"]
 DATA_DIR.mkdir(exist_ok=True)
+
+# --- GOOGLE SHEETS HELPERS ---------------------------------------------------
+def _gs_client():
+    info = st.secrets["gcp_service_account"]
+    creds = Credentials.from_service_account_info(
+        info, scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    return gspread.authorize(creds)
+
+def _gs_ws():
+    """Retourne l'onglet Google Sheets (le crée avec l'entête si besoin)."""
+    client = _gs_client()
+    sheet_id = st.secrets["SHEETS"]["SHEET_ID"]
+    sheet_name = st.secrets["SHEETS"]["SHEET_NAME"]
+    sh = client.open_by_key(sheet_id)
+    try:
+        ws = sh.worksheet(sheet_name)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sh.add_worksheet(title=sheet_name, rows=1000, cols=10)
+        ws.update('A1:E1', [["poste","fournisseur","description","montant","date"]])
+    return ws
+
+def load_data() -> pd.DataFrame:
+    try:
+        ws = _gs_ws()
+        rows = ws.get_all_records()
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return pd.DataFrame(columns=["poste","fournisseur","description","montant","date"])
+        if "montant" in df.columns:
+            df["montant"] = pd.to_numeric(df["montant"], errors="coerce").fillna(0.0)
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce").dt.date
+        return df
+    except Exception as e:
+        st.sidebar.error(f"❌ Erreur lecture Google Sheets : {e}")
+        return pd.DataFrame(columns=["poste","fournisseur","description","montant","date"])
+
+def save_data(df: pd.DataFrame):
+    """Réécrit l'entier du DataFrame dans la feuille."""
+    try:
+        ws = _gs_ws()
+        ws.clear()
+        ws.update('A1:E1', [["poste","fournisseur","description","montant","date"]])
+        out = df.copy()
+        out["montant"] = pd.to_numeric(out["montant"], errors="coerce").fillna(0.0)
+        out["date"] = pd.to_datetime(out["date"], errors="coerce").dt.strftime("%Y-%m-%d")
+        if len(out):
+            ws.append_rows(out[["poste","fournisseur","description","montant","date"]].values.tolist())
+        st.sidebar.success("✅ Données synchronisées avec Google Sheets")
+    except Exception as e:
+        st.sidebar.error(f"❌ Erreur écriture Google Sheets : {e}")
+
